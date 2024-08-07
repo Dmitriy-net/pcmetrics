@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -120,11 +121,11 @@ func listMetricsHandler(ms *MemStorage) http.HandlerFunc {
 		w.Write([]byte("<html><body><h1>Metrics</h1><ul>"))
 
 		for name, value := range gauges {
-			w.Write([]byte(fmt.Sprintf("<li>%s (gauge): %g</li>", name, value)))
+			w.Write([]byte(fmt.Sprintf("<li>Gauge: %s = %g</li>", name, value)))
 		}
 
 		for name, value := range counters {
-			w.Write([]byte(fmt.Sprintf("<li>%s (counter): %d</li>", name, value)))
+			w.Write([]byte(fmt.Sprintf("<li>Counter: %s = %d</li>", name, value)))
 		}
 
 		w.Write([]byte("</ul></body></html>"))
@@ -133,11 +134,15 @@ func listMetricsHandler(ms *MemStorage) http.HandlerFunc {
 
 func main() {
 	address := flag.String("a", "localhost:8080", "HTTP server address")
+
 	flag.Parse()
 
-	memStorage := NewMemStorage()
+	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
+		*address = envAddress
+	}
 
 	r := chi.NewRouter()
+	memStorage := NewMemStorage()
 
 	r.Post("/update/{type}/{name}/{value}", updateMetricHandler(memStorage))
 	r.Get("/value/{type}/{name}", getValueHandler(memStorage))
