@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -9,9 +10,9 @@ import (
 )
 
 const (
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
-	serverURL      = "http://localhost:8080"
+	defaultPollInterval   = 2 * time.Second
+	defaultReportInterval = 10 * time.Second
+	defaultServerURL      = "http://localhost:8080"
 )
 
 type Metrics struct {
@@ -65,17 +66,17 @@ func updateMetrics() {
 	metrics.Counters["PollCount"]++
 }
 
-func reportMetrics() {
+func reportMetrics(serverURL string) {
 	for name, value := range metrics.Gauges {
-		sendMetric("gauge", name, fmt.Sprintf("%f", value))
+		sendMetric(serverURL, "gauge", name, fmt.Sprintf("%g", value))
 	}
 
 	for name, value := range metrics.Counters {
-		sendMetric("counter", name, fmt.Sprintf("%d", value))
+		sendMetric(serverURL, "counter", name, fmt.Sprintf("%d", value))
 	}
 }
 
-func sendMetric(metricType, name, value string) {
+func sendMetric(serverURL, metricType, name, value string) {
 	url := fmt.Sprintf("%s/update/%s/%s/%s", serverURL, metricType, name, value)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -98,10 +99,25 @@ func sendMetric(metricType, name, value string) {
 }
 
 func main() {
+	address := flag.String("a", defaultServerURL, "HTTP server address")
+	reportInterval := flag.Int("r", 10, "Report interval in seconds")
+	pollInterval := flag.Int("p", 2, "Poll interval in seconds")
+
+	flag.Parse()
+
+	serverURL := *address
+	pollIntervalDuration := time.Duration(*pollInterval) * time.Second
+	reportIntervalDuration := time.Duration(*reportInterval) * time.Second
+
+	tickerPoll := time.NewTicker(pollIntervalDuration)
+	tickerReport := time.NewTicker(reportIntervalDuration)
+
 	for {
-		updateMetrics()
-		time.Sleep(pollInterval)
-		reportMetrics()
-		time.Sleep(reportInterval - pollInterval)
+		select {
+		case <-tickerPoll.C:
+			updateMetrics()
+		case <-tickerReport.C:
+			reportMetrics(serverURL)
+		}
 	}
 }
