@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -88,7 +90,6 @@ func sendMetric(serverURL, metricType, name, value string) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("Error sending request: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -105,19 +106,32 @@ func main() {
 
 	flag.Parse()
 
+	// Override with environment variables if set
+	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
+		*address = envAddress
+	}
+
+	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
+		if value, err := strconv.Atoi(envReportInterval); err == nil {
+			*reportInterval = value
+		}
+	}
+
+	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
+		if value, err := strconv.Atoi(envPollInterval); err == nil {
+			*pollInterval = value
+		}
+	}
+
 	serverURL := *address
 	pollIntervalDuration := time.Duration(*pollInterval) * time.Second
 	reportIntervalDuration := time.Duration(*reportInterval) * time.Second
 
-	tickerPoll := time.NewTicker(pollIntervalDuration)
-	tickerReport := time.NewTicker(reportIntervalDuration)
-
 	for {
-		select {
-		case <-tickerPoll.C:
-			updateMetrics()
-		case <-tickerReport.C:
-			reportMetrics(serverURL)
-		}
+		updateMetrics()
+		time.Sleep(pollIntervalDuration)
+
+		reportMetrics(serverURL)
+		time.Sleep(reportIntervalDuration - pollIntervalDuration)
 	}
 }
