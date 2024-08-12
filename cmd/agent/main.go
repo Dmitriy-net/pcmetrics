@@ -3,12 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/Dmitriy-net/pcmetrics/internal/logger"
 )
 
 const (
@@ -32,6 +35,7 @@ func init() {
 }
 
 func updateMetrics() {
+
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
 
@@ -83,6 +87,7 @@ func sendMetric(serverURL, metricType, name, value string) {
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		fmt.Printf("Error creating request: %v\n", err)
+		log.Printf("Error creating request: %v\n", err)
 		return
 	}
 	req.Header.Set("Content-Type", "text/plain")
@@ -96,29 +101,42 @@ func sendMetric(serverURL, metricType, name, value string) {
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Server returned non-OK status: %s\n", resp.Status)
+		log.Printf("Server returned non-OK status: %s\n", resp.Status)
 	}
 }
 
 func main() {
+	time.Sleep(5000)
+
+	logFile := logger.SetupLogging("agent.log")
+	defer logFile.Close()
+
 	address := flag.String("a", defaultServerURL, "HTTP server address")
 	reportInterval := flag.Int("r", 10, "Report interval in seconds")
 	pollInterval := flag.Int("p", 2, "Poll interval in seconds")
 
 	flag.Parse()
 
-	// Override with environment variables if set
 	if envAddress := os.Getenv("ADDRESS"); envAddress != "" {
 		*address = envAddress
 	}
 
 	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
-		if value, err := strconv.Atoi(envReportInterval); err == nil {
+		value, err := strconv.Atoi(envReportInterval)
+		if err != nil {
+			fmt.Printf("Invalid REPORT_INTERVAL value: %v\n", err)
+			log.Printf("Invalid REPORT_INTERVAL value: %v\n", err)
+		} else {
 			*reportInterval = value
 		}
 	}
 
 	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
-		if value, err := strconv.Atoi(envPollInterval); err == nil {
+		value, err := strconv.Atoi(envPollInterval)
+		if err != nil {
+			fmt.Printf("Invalid POLL_INTERVAL value: %v\n", err)
+			log.Printf("Invalid POLL_INTERVAL value: %v\n", err)
+		} else {
 			*pollInterval = value
 		}
 	}
@@ -126,6 +144,8 @@ func main() {
 	serverURL := *address
 	pollIntervalDuration := time.Duration(*pollInterval) * time.Second
 	reportIntervalDuration := time.Duration(*reportInterval) * time.Second
+	fmt.Printf("Send requests to %s\n", *address)
+	log.Printf("Send requests to %s\n", *address)
 
 	for {
 		updateMetrics()
