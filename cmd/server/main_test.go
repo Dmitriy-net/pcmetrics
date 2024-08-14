@@ -4,10 +4,12 @@ import (
 	"log"
 	"os"
 	"testing"
+
+	"github.com/Dmitriy-net/pcmetrics/internal/logger"
 )
 
 func TestSetupLogging(t *testing.T) {
-	logFile := setupLogging()
+	logFile := logger.SetupLogging()
 	defer logFile.Close()
 
 	// Проверка, что файл действительно создан
