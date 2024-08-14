@@ -9,7 +9,7 @@ import (
 )
 
 func TestSetupLogging(t *testing.T) {
-	logFile := logger.SetupLogging()
+	logFile := logger.SetupLogging("app.log")
 	defer logFile.Close()
 
 	// Проверка, что файл действительно создан
